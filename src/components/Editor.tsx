@@ -1,93 +1,79 @@
-import { useRef, useLayoutEffect, useImperativeHandle, forwardRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Crepe } from '@milkdown/crepe';
+import { EditorView } from '@codemirror/view';
+import '@milkdown/crepe/theme/frame.css';
+import '@milkdown/crepe/theme/frame-dark.css';
 
 interface EditorProps {
   value: string;
-  onChange?: (markdown: string) => void;
+  onChange: (markdown: string) => void;
+  textScale: number;
 }
 
-export interface EditorHandle {
-  getMarkdown: () => string;
+function refreshCodeBlockLayout(root: HTMLElement): void {
+  const editorNodes = root.querySelectorAll<HTMLElement>('.milkdown-code-block .cm-editor');
+  editorNodes.forEach((editorNode) => {
+    const view = EditorView.findFromDOM(editorNode);
+    if (!view) return;
+
+    view.requestMeasure();
+    view.dispatch({});
+  });
 }
 
-export const Editor = forwardRef<EditorHandle, EditorProps>(({ value, onChange }, ref) => {
+export function Editor({ value, onChange, textScale }: EditorProps) {
   const divRef = useRef<HTMLDivElement>(null);
   const crepeRef = useRef<Crepe | null>(null);
-  const valueRef = useRef<string>(value);
+  const onChangeRef = useRef(onChange);
 
-  useImperativeHandle(ref, () => ({
-    getMarkdown: () => {
-      if (crepeRef.current) {
-        return crepeRef.current.getMarkdown();
-      }
-      return '';
-    }
-  }));
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   useLayoutEffect(() => {
     if (!divRef.current) return;
 
     let cancelled = false;
 
-    // Detect dark mode
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // Destroy existing editor if it exists
+    if (crepeRef.current) {
+      crepeRef.current.destroy();
+      crepeRef.current = null;
+    }
 
-    // Dynamically import the appropriate theme
-    const themePromise = isDark
-      ? import('@milkdown/crepe/theme/frame-dark.css')
-      : import('@milkdown/crepe/theme/frame.css');
+    // Clear any existing DOM content
+    if (divRef.current) {
+      divRef.current.innerHTML = '';
+    }
 
-    themePromise.then(() => {
-      // Don't create editor if effect was cleaned up
-      if (cancelled) return;
+    // Create Crepe instance with current value
+    const crepe = new Crepe({
+      root: divRef.current!,
+      defaultValue: value,
+      features: {
+        // Enable all default features
+      },
+    });
 
-      // Destroy existing editor if it exists
-      if (crepeRef.current) {
-        crepeRef.current.destroy();
-        crepeRef.current = null;
-      }
-
-      // Clear any existing DOM content
-      if (divRef.current) {
-        divRef.current.innerHTML = '';
-      }
-
-      // Create Crepe instance with current value
-      const crepe = new Crepe({
-        root: divRef.current!,
-        defaultValue: value,
-        features: {
-          // Enable all default features
-        },
-      });
-
-      crepe.create().then(() => {
-        // Check again before storing reference
-        if (cancelled) {
-          crepe.destroy();
-          return;
-        }
-
-        console.log('Crepe editor created with value length:', value.length);
-        crepeRef.current = crepe;
+    crepe.on((listener) => {
+      listener.markdownUpdated((_, nextMarkdown) => {
+        onChangeRef.current(nextMarkdown);
       });
     });
 
-    // Listen for theme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleThemeChange = (e: MediaQueryListEvent) => {
-      if (crepeRef.current) {
-        crepeRef.current.destroy();
+    crepe.create().then(() => {
+      // Check again before storing reference
+      if (cancelled) {
+        crepe.destroy();
+        return;
       }
-      window.location.reload();
-    };
 
-    mediaQuery.addEventListener('change', handleThemeChange);
+      crepeRef.current = crepe;
+    });
 
     // Cleanup
     return () => {
       cancelled = true;
-      mediaQuery.removeEventListener('change', handleThemeChange);
       if (crepeRef.current) {
         crepeRef.current.destroy();
         crepeRef.current = null;
@@ -97,7 +83,27 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(({ value, onChange }
         divRef.current.innerHTML = '';
       }
     };
-  }, [value]); // Recreate editor when value changes
+  }, []); // Initialize once per mount; App remounts by fileVersion on file lifecycle changes.
+
+  useEffect(() => {
+    const root = divRef.current;
+    if (!root) return;
+
+    // Defer until CSS variables are applied, then force CM gutters to recompute width.
+    let frameA = 0;
+    let frameB = 0;
+    frameA = window.requestAnimationFrame(() => {
+      frameB = window.requestAnimationFrame(() => {
+        refreshCodeBlockLayout(root);
+        window.dispatchEvent(new Event('resize'));
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameA);
+      window.cancelAnimationFrame(frameB);
+    };
+  }, [textScale]);
 
   return <div ref={divRef} className="editor-container" />;
-});
+}

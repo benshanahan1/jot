@@ -4,9 +4,21 @@
   line-height: 24px;
   font-weight: 400;
 
-  color: #0f0f0f;
-  background-color: #f6f6f6;
+  --color-text: #0f0f0f;
+  --color-bg: #f6f6f6;
+  --toolbar-start: #f8f8f8;
+  --toolbar-end: #f0f0f0;
+  --toolbar-border: #d8d8d8;
+  --toolbar-shadow: rgba(0, 0, 0, 0.05);
+  --muted-text: #666;
+  --file-name-text: #4a4a4a;
+  --accent: #396cd8;
+  --input-bg: #fff;
+  --input-shadow: rgba(57, 108, 216, 0.1);
+  --file-hover-bg: rgba(0, 0, 0, 0.03);
 
+  color: var(--color-text);
+  background-color: var(--color-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -14,12 +26,28 @@
   -webkit-text-size-adjust: 100%;
 }
 
-/* Full-height app container */
+:root[data-theme='dark'] {
+  --color-text: #f6f6f6;
+  --color-bg: #1a1a1a;
+  --toolbar-start: #2a2a2a;
+  --toolbar-end: #242424;
+  --toolbar-border: #3a3a3a;
+  --toolbar-shadow: rgba(0, 0, 0, 0.3);
+  --muted-text: #999;
+  --file-name-text: #d0d0d0;
+  --accent: #24c8db;
+  --input-bg: #1a1a1a;
+  --input-shadow: rgba(36, 200, 219, 0.1);
+  --file-hover-bg: rgba(255, 255, 255, 0.05);
+}
+
 body, html, #root {
   margin: 0;
   padding: 0;
   height: 100vh;
   overflow: hidden;
+  background-color: var(--color-bg);
+  color: var(--color-text);
 }
 
 .app-container {
@@ -29,95 +57,96 @@ body, html, #root {
   width: 100vw;
 }
 
-/* Toolbar styles */
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 1rem;
-  background-color: #e8e8e8;
-  border-bottom: 1px solid #d0d0d0;
+  padding: 0.3rem 0.8rem;
+  background: linear-gradient(180deg, var(--toolbar-start) 0%, var(--toolbar-end) 100%);
+  border-bottom: 1px solid var(--toolbar-border);
+  box-shadow: 0 1px 3px var(--toolbar-shadow);
+  flex-shrink: 0;
+  gap: 0.35rem;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 1 auto;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.toolbar-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--toolbar-border);
+  background: var(--input-bg);
+  color: var(--file-name-text);
+  border-radius: 6px;
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.toolbar-icon-button:hover {
+  background: var(--file-hover-bg);
+}
+
+.toolbar-icon-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.app-logo {
+  margin-right: 0.3rem;
+  color: var(--muted-text);
   flex-shrink: 0;
 }
 
 .toolbar-file-info {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
 }
 
 .file-name {
-  font-weight: 500;
-  font-size: 0.9rem;
-}
-
-.toolbar-buttons {
-  display: flex;
-  gap: 0.5rem;
-}
-
-/* Button styles */
-button {
-  border-radius: 6px;
-  border: 1px solid transparent;
-  padding: 0.4em 1em;
-  font-size: 0.875em;
-  font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: all 0.2s;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: var(--file-name-text);
 }
 
-button:hover:not(:disabled) {
-  border-color: #396cd8;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+.file-name:hover {
+  background-color: var(--file-hover-bg);
 }
 
-button:active:not(:disabled) {
-  background-color: #e8e8e8;
-  transform: translateY(1px);
+.file-name-input {
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background-color: var(--input-bg);
+  color: var(--file-name-text);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--input-shadow);
 }
 
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Editor wrapper - fills remaining space */
 .editor-wrapper {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
-}
-
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #1a1a1a;
-  }
-
-  .toolbar {
-    background-color: #2a2a2a;
-    border-bottom-color: #404040;
-  }
-
-  button {
-    color: #ffffff;
-    background-color: #333333;
-  }
-
-  button:hover:not(:disabled) {
-    border-color: #24c8db;
-    background-color: #3a3a3a;
-  }
-
-  button:active:not(:disabled) {
-    background-color: #282828;
-  }
 }

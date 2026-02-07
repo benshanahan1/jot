@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { readTextFile, writeTextFile, remove } from '@tauri-apps/plugin-fs';
 
 interface UseMarkdownFileReturn {
   markdown: string;
@@ -9,9 +9,10 @@ interface UseMarkdownFileReturn {
   isDirty: boolean;
   fileVersion: number;
   openFile: () => Promise<void>;
-  saveFile: (content: string) => Promise<void>;
-  saveFileAs: (content: string) => Promise<void>;
+  saveFile: () => Promise<void>;
+  saveFileAs: () => Promise<void>;
   newFile: () => void;
+  renameFile: (newPath: string) => Promise<void>;
 }
 
 export function useMarkdownFile(): UseMarkdownFileReturn {
@@ -23,13 +24,11 @@ export function useMarkdownFile(): UseMarkdownFileReturn {
   const isDirty = markdown !== lastSavedContent;
 
   const setMarkdown = useCallback((content: string) => {
-    console.log('setMarkdown called with length:', content.length);
     setMarkdownState(content);
   }, []);
 
   const openFile = useCallback(async () => {
     try {
-      console.log('openFile called');
       const selected = await open({
         multiple: false,
         filters: [{
@@ -38,20 +37,12 @@ export function useMarkdownFile(): UseMarkdownFileReturn {
         }]
       });
 
-      console.log('Dialog result:', selected);
-
       if (selected && typeof selected === 'string') {
-        console.log('Reading file:', selected);
         const content = await readTextFile(selected);
-        console.log('File content length:', content.length);
-        console.log('Setting markdown state...');
         setMarkdownState(content);
         setLastSavedContent(content);
         setCurrentPath(selected);
         setFileVersion(v => v + 1);
-        console.log('State updated successfully');
-      } else {
-        console.log('No file selected or dialog cancelled');
       }
     } catch (error) {
       console.error('Error opening file:', error);
@@ -59,27 +50,7 @@ export function useMarkdownFile(): UseMarkdownFileReturn {
     }
   }, []);
 
-  const saveFile = useCallback(async (content: string) => {
-    console.log('saveFile called, content length:', content.length);
-    if (!currentPath) {
-      await saveFileAs(content);
-      return;
-    }
-
-    try {
-      console.log('Writing to file:', currentPath);
-      console.log('Content preview:', content.substring(0, 100));
-      await writeTextFile(currentPath, content);
-      setMarkdownState(content);
-      setLastSavedContent(content);
-      console.log('File saved successfully');
-    } catch (error) {
-      console.error('Error saving file:', error);
-      alert(`Failed to save file: ${error}`);
-    }
-  }, [currentPath]);
-
-  const saveFileAs = useCallback(async (content: string) => {
+  const saveFileAs = useCallback(async () => {
     try {
       const selected = await save({
         filters: [{
@@ -90,9 +61,8 @@ export function useMarkdownFile(): UseMarkdownFileReturn {
       });
 
       if (selected) {
-        await writeTextFile(selected, content);
-        setMarkdownState(content);
-        setLastSavedContent(content);
+        await writeTextFile(selected, markdown);
+        setLastSavedContent(markdown);
         setCurrentPath(selected);
         setFileVersion(v => v + 1);
       }
@@ -100,7 +70,22 @@ export function useMarkdownFile(): UseMarkdownFileReturn {
       console.error('Error saving file:', error);
       alert(`Failed to save file: ${error}`);
     }
-  }, [currentPath]);
+  }, [currentPath, markdown]);
+
+  const saveFile = useCallback(async () => {
+    if (!currentPath) {
+      await saveFileAs();
+      return;
+    }
+
+    try {
+      await writeTextFile(currentPath, markdown);
+      setLastSavedContent(markdown);
+    } catch (error) {
+      console.error('Error saving file:', error);
+      alert(`Failed to save file: ${error}`);
+    }
+  }, [currentPath, markdown, saveFileAs]);
 
   const newFile = useCallback(() => {
     setMarkdownState('');
@@ -108,6 +93,20 @@ export function useMarkdownFile(): UseMarkdownFileReturn {
     setCurrentPath(null);
     setFileVersion(v => v + 1);
   }, []);
+
+  const renameFile = useCallback(async (newPath: string) => {
+    if (!currentPath || currentPath === newPath) return;
+
+    try {
+      const content = await readTextFile(currentPath);
+      await writeTextFile(newPath, content);
+      await remove(currentPath);
+      setCurrentPath(newPath);
+    } catch (error) {
+      console.error('Error renaming file:', error);
+      throw error;
+    }
+  }, [currentPath]);
 
   return {
     markdown,
@@ -118,6 +117,7 @@ export function useMarkdownFile(): UseMarkdownFileReturn {
     openFile,
     saveFile,
     saveFileAs,
-    newFile
+    newFile,
+    renameFile,
   };
 }

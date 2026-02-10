@@ -75,6 +75,21 @@ describe('useMarkdownFile', () => {
     expect(result.current.isDirty).toBe(false);
   });
 
+  it('opens an explicit path and resets dirty state', async () => {
+    vi.mocked(readTextFile).mockResolvedValue('# startup');
+
+    const { result } = renderHook(() => useMarkdownFile());
+
+    await act(async () => {
+      await result.current.openFileAtPath('/tmp/startup.md');
+    });
+
+    expect(readTextFile).toHaveBeenCalledWith('/tmp/startup.md');
+    expect(result.current.markdown).toBe('# startup');
+    expect(result.current.currentPath).toBe('/tmp/startup.md');
+    expect(result.current.isDirty).toBe(false);
+  });
+
   it('renames the current file path', async () => {
     vi.mocked(save).mockResolvedValue('/tmp/old.md');
     vi.mocked(readTextFile).mockResolvedValue('persisted');

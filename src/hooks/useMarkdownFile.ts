@@ -9,6 +9,7 @@ interface UseMarkdownFileReturn {
   isDirty: boolean;
   fileVersion: number;
   openFile: () => Promise<void>;
+  openFileAtPath: (path: string) => Promise<void>;
   saveFile: () => Promise<void>;
   saveFileAs: () => Promise<void>;
   newFile: () => void;
@@ -27,6 +28,14 @@ export function useMarkdownFile(): UseMarkdownFileReturn {
     setMarkdownState(content);
   }, []);
 
+  const loadFileFromPath = useCallback(async (path: string) => {
+    const content = await readTextFile(path);
+    setMarkdownState(content);
+    setLastSavedContent(content);
+    setCurrentPath(path);
+    setFileVersion(v => v + 1);
+  }, []);
+
   const openFile = useCallback(async () => {
     try {
       const selected = await open({
@@ -38,17 +47,22 @@ export function useMarkdownFile(): UseMarkdownFileReturn {
       });
 
       if (selected && typeof selected === 'string') {
-        const content = await readTextFile(selected);
-        setMarkdownState(content);
-        setLastSavedContent(content);
-        setCurrentPath(selected);
-        setFileVersion(v => v + 1);
+        await loadFileFromPath(selected);
       }
     } catch (error) {
       console.error('Error opening file:', error);
       alert(`Failed to open file: ${error}`);
     }
-  }, []);
+  }, [loadFileFromPath]);
+
+  const openFileAtPath = useCallback(async (path: string) => {
+    try {
+      await loadFileFromPath(path);
+    } catch (error) {
+      console.error('Error opening file from path:', error);
+      alert(`Failed to open file: ${error}`);
+    }
+  }, [loadFileFromPath]);
 
   const saveFileAs = useCallback(async () => {
     try {
@@ -115,6 +129,7 @@ export function useMarkdownFile(): UseMarkdownFileReturn {
     isDirty,
     fileVersion,
     openFile,
+    openFileAtPath,
     saveFile,
     saveFileAs,
     newFile,

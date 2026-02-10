@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactElement } from 'react';
 import App from './App';
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 import { useMarkdownFile } from './hooks/useMarkdownFile';
 
 type MenuActionEvent = { payload: string };
@@ -32,6 +33,16 @@ vi.mock('./hooks/useMarkdownFile', () => ({
 
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn(),
+}));
+
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(),
+}));
+
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: () => ({
+    setTitle: vi.fn(),
+  }),
 }));
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
@@ -68,11 +79,14 @@ describe('App critical flows', () => {
       isDirty: false,
       fileVersion: 1,
       openFile: vi.fn(),
+      openFileAtPath: vi.fn(),
       saveFile,
       saveFileAs: vi.fn(),
       newFile: vi.fn(),
       renameFile: vi.fn(),
     });
+
+    vi.mocked(invoke).mockResolvedValue(null);
 
     vi.mocked(listen).mockImplementation(async (_eventName, handler) => {
       menuHandler = handler as MenuHandler;

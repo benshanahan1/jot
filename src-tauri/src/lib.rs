@@ -3,6 +3,20 @@ use tauri::{
     Emitter,
 };
 
+#[tauri::command]
+fn startup_file_path() -> Option<String> {
+    let first_path_arg = std::env::args().skip(1).find(|arg| !arg.starts_with('-'))?;
+    let path = std::path::PathBuf::from(first_path_arg);
+
+    if path.is_absolute() {
+        return Some(path.to_string_lossy().into_owned());
+    }
+
+    std::env::current_dir()
+        .ok()
+        .map(|cwd| cwd.join(path).to_string_lossy().into_owned())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -170,6 +184,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .invoke_handler(tauri::generate_handler![startup_file_path])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

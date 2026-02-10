@@ -9,6 +9,7 @@ import { Toast } from "./components/Toast";
 import { useMarkdownFile } from "./hooks/useMarkdownFile";
 import { useHotkeys } from "./hooks/useHotkeys";
 import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { homeDir } from "@tauri-apps/api/path";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -43,6 +44,7 @@ function App() {
     isDirty,
     fileVersion,
     openFile,
+    openFileAtPath,
     saveFile,
     saveFileAs,
     newFile,
@@ -196,6 +198,23 @@ function App() {
     handleZoomReset,
     isTauriRuntime,
   ]);
+
+  useEffect(() => {
+    if (!isTauriRuntime) return;
+
+    const openStartupFile = async () => {
+      try {
+        const startupPath = await invoke<string | null>('startup_file_path');
+        if (startupPath) {
+          await openFileAtPath(startupPath);
+        }
+      } catch (error) {
+        console.error('Failed to load startup file path:', error);
+      }
+    };
+
+    void openStartupFile();
+  }, [isTauriRuntime, openFileAtPath]);
 
   useEffect(() => {
     if (themeMode === 'system') {

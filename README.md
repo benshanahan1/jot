@@ -80,6 +80,33 @@ npm run tauri build
 | Zoom Out | `Cmd+-` | `Ctrl+-` |
 | Reset Zoom | `Cmd+0` | `Ctrl+0` |
 
+## Command Line
+
+Open a file directly from your terminal:
+
+```bash
+jot file.md
+```
+
+On macOS, `jot` is also a built-in system command (`/usr/bin/jot`), so install the wrapper below to make this app's `jot` command take priority.
+
+Install a local CLI wrapper:
+
+```bash
+./scripts/install-cli.sh
+```
+
+This also adds a zsh completion override (`compdef _files jot`) so `jot <TAB>` completes filenames instead of system `jot` options.
+
+Then verify:
+
+```bash
+which -a jot
+source ~/.zshrc
+compdef | grep -E '^jot='
+jot README.md
+```
+
 ## Acknowledgments
 
 - Built with [Tauri](https://tauri.app/)

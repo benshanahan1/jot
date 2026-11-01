@@ -19,12 +19,13 @@ Clean, distraction-free writing with live markdown rendering
 
 ## Features
 
-- Minimalist design focused on writing
-- Live markdown rendering
+- Opens instantly from the terminal (`jot notes.md`) or Finder
+- Tabs, with every open file in one window
+- Live markdown rendering, with front matter left untouched
+- Serif, sans, and mono fonts, bundled so they work offline
+- Light, dark, and system themes
+- A keyboard shortcut for everything, shown in the menus
 - Cross-platform (macOS, Windows, Linux)
-- Multiple fonts and themes
-- Text scaling and zoom controls
-- Fast and lightweight
 
 ## Installation
 
@@ -70,42 +71,51 @@ npm run tauri build
 
 ## Keyboard Shortcuts
 
-| Action | macOS | Windows/Linux |
-|--------|-------|---------------|
-| New File | `Cmd+N` | `Ctrl+N` |
-| Open File | `Cmd+O` | `Ctrl+O` |
-| Save | `Cmd+S` | `Ctrl+S` |
-| Save As | `Cmd+Shift+S` | `Ctrl+Shift+S` |
-| Zoom In | `Cmd+=` | `Ctrl+=` |
-| Zoom Out | `Cmd+-` | `Ctrl+-` |
-| Reset Zoom | `Cmd+0` | `Ctrl+0` |
+Every menu item shows its shortcut. On Windows and Linux, use `Ctrl` for `Cmd` and `Alt` for `Option`.
+
+| Action | Shortcut |
+|--------|----------|
+| New tab | `Cmd+N` |
+| Open | `Cmd+O` |
+| Save / Save As | `Cmd+S` / `Cmd+Shift+S` |
+| Rename | `Cmd+Shift+R` (or double-click the tab) |
+| Close tab / window | `Cmd+W` / `Cmd+Shift+W` |
+| Next / previous tab | `Cmd+Shift+]` / `Cmd+Shift+[` (or `Ctrl+Tab` / `Ctrl+Shift+Tab`) |
+| Go to tab 1–8 / last tab | `Cmd+1`…`Cmd+8` / `Cmd+9` |
+| Theme: system / light / dark | `Cmd+Option+1` / `2` / `3` |
+| Font: serif / sans / mono | `Cmd+Option+4` / `5` / `6` |
+| Wide layout | `Cmd+\` |
+| Zoom in / out / reset | `Cmd+=` / `Cmd+-` / `Cmd+0` |
 
 ## Command Line
 
-Open a file directly from your terminal:
+Open a file from your terminal (it doesn't need to exist yet):
 
 ```bash
-jot file.md
+jot notes.md
 ```
 
-On macOS, `jot` is also a built-in system command (`/usr/bin/jot`), so install the wrapper below to make this app's `jot` command take priority.
-
-Install a local CLI wrapper:
+macOS ships its own `/usr/bin/jot`, so install a wrapper that takes priority:
 
 ```bash
 ./scripts/install-cli.sh
 ```
 
-This also adds a zsh completion override (`compdef _files jot`) so `jot <TAB>` completes filenames instead of system `jot` options.
+This puts a `jot` command in `~/.local/bin` (override with `--bin-dir`), replaces any wrapper from an earlier install, and adds a zsh completion override so `jot <TAB>` completes file names. Make sure `~/.local/bin` comes before `/usr/bin` on your `PATH`; the script warns you if it doesn't.
 
-Then verify:
+If jot is already running, files open as new tabs in its window.
+
+To remove the command and the completion override:
 
 ```bash
-which -a jot
-source ~/.zshrc
-compdef | grep -E '^jot='
-jot README.md
+./scripts/install-cli.sh --uninstall
 ```
+
+To remove the app itself, move `jot.app` to the Trash.
+
+### Default app for Markdown files
+
+To open `.md` files in jot when you double-click them on macOS, select any `.md` file in Finder, press `Cmd+I`, choose jot under **Open with**, and click **Change All…**.
 
 ## Acknowledgments
 

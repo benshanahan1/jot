@@ -13,8 +13,10 @@
     "windows": [
       {
         "title": "jot",
-        "width": 800,
-        "height": 600
+        "width": 900,
+        "height": 700,
+        "minWidth": 420,
+        "minHeight": 300
       }
     ],
     "security": {
@@ -30,6 +32,16 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown"],
+        "name": "Markdown Document",
+        "description": "Markdown Document",
+        "mimeType": "text/markdown",
+        "role": "Editor",
+        "rank": "Default"
+      }
     ]
   }
 }

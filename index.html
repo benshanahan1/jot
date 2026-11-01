@@ -2,9 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Jot - Markdown Editor</title>
+    <title>jot</title>
+    <script>
+      // Apply the saved theme before first paint to avoid a light flash in dark mode.
+      // Mirrors usePreferences (storage key) and useResolvedTheme.
+      try {
+        var mode = JSON.parse(localStorage.getItem('jot.preferences') || '{}').themeMode;
+        var dark = mode === 'dark' || (mode !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      } catch (e) {}
+    </script>
   </head>
 
   <body>

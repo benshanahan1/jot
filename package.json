@@ -12,7 +12,12 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@codemirror/view": "^6.39.12",
+    "@fontsource-variable/eb-garamond": "^5.3.0",
+    "@fontsource-variable/inconsolata": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@milkdown/crepe": "^7.18.0",
+    "@milkdown/kit": "^7.18.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-fs": "^2.4.5",

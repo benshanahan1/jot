@@ -7,6 +7,11 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [react()],
+  resolve: {
+    // CodeMirror and ProseMirror break if two copies of their core packages are bundled
+    // ("Unrecognized extension value in extension set"), e.g. after a partial dependency upgrade.
+    dedupe: ["@codemirror/state", "@codemirror/view", "prosemirror-model", "prosemirror-state", "prosemirror-view"],
+  },
   test: {
     environment: "jsdom",
     globals: true,

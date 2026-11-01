@@ -11,6 +11,11 @@ export function splitExtension(fileName: string): [stem: string, extension: stri
   return [fileName.slice(0, lastDot), fileName.slice(lastDot)];
 }
 
+/** The name shown for a document: its file name, or `Untitled` if it has never been saved. */
+export function getDisplayName(path: string | null): string {
+  return path ? getFileName(path) : 'Untitled';
+}
+
 export function getFileStem(path: string): string {
   return splitExtension(getFileName(path))[0];
 }

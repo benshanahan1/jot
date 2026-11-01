@@ -12,8 +12,8 @@ interface HotkeyHandlers {
 }
 
 /**
- * Shortcuts the native menu can't express: Ctrl+Tab, Mod+1…9 for tabs, and zoom key variants
- * (Mod++ as well as Mod+=). Everything else lives in the menu, which also displays it.
+ * Shortcuts handled in the webview: ones the native menu can't express (Ctrl+Tab, Mod+1…9) and
+ * zoom, so variants like Mod++ work alongside the menu's Mod+=. The rest live in the menu.
  */
 export function useHotkeys(handlers: HotkeyHandlers): void {
   // Read handlers through a ref so the window listener is attached once, not on every render.

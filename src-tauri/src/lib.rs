@@ -12,7 +12,6 @@ use tauri_plugin_fs::FsExt;
 
 /// Files the command line, a second `jot` launch, or Finder asked us to open, held until the
 /// frontend claims them.
-#[derive(Default)]
 struct PendingFiles(Mutex<Vec<PathBuf>>);
 
 impl PendingFiles {
@@ -84,8 +83,8 @@ fn sync_view_menu(app: AppHandle, checked: Vec<String>) {
     }
 }
 
-// Every custom item has an id the frontend handles (see menuActions in src/App.tsx) and a
-// shortcut, shown next to it in the menu.
+// Every custom item has an id the frontend handles (see menuActions in src/App.tsx), and every
+// command has a shortcut, shown next to it in the menu.
 fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let item = |id: &str, label: &str, shortcut: &str| {
         MenuItem::with_id(app, id, label, true, Some(shortcut))
@@ -229,8 +228,7 @@ fn handle_run_event<R: Runtime>(app: &AppHandle<R>, event: RunEvent) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let cwd = std::env::current_dir().unwrap_or_default();
-    let pending = PendingFiles::default();
-    pending.0.lock().unwrap().extend(paths_from_args(std::env::args_os().skip(1), &cwd));
+    let pending = PendingFiles(Mutex::new(paths_from_args(std::env::args_os().skip(1), &cwd)));
 
     let mut builder = tauri::Builder::default();
 

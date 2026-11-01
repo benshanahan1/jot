@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { isDocumentDirty, useDocuments } from './useDocuments';
 import type { EditorHandle } from '../components/Editor';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { exists, readTextFile, rename, writeTextFile } from '@tauri-apps/plugin-fs';
+import { exists, readTextFile, rename, stat, writeTextFile } from '@tauri-apps/plugin-fs';
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn(),
@@ -14,6 +14,7 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
   exists: vi.fn(),
   readTextFile: vi.fn(),
   rename: vi.fn(),
+  stat: vi.fn(),
   writeTextFile: vi.fn(),
 }));
 
@@ -156,7 +157,7 @@ describe('useDocuments', () => {
 
     act(() => result.current.handleEditorReady(id, '- item\n'));
 
-    expect(result.current.getDocument(id)).toMatchObject({ markdown: '- item\n', savedContent: '- item\n' });
+    expect(result.current.getDocument(id)).toMatchObject({ markdown: '- item\n', savedMarkdown: '- item\n' });
   });
 
   it('keeps front matter out of the editor and writes it back on save', async () => {
@@ -202,7 +203,16 @@ describe('useDocuments', () => {
     expect(active(result.current)).toMatchObject({ path: null, markdown: '' });
   });
 
-  it('renames in place, refusing to overwrite but allowing case-only changes', async () => {
+  // Fake inodes: paths differing only in case are the same file unless `caseSensitive`.
+  function mockFilesystem(caseSensitive: boolean) {
+    vi.mocked(stat).mockImplementation(async (path) => ({
+      ino: [...(caseSensitive ? String(path) : String(path).toLowerCase())].reduce((n, c) => n * 31 + c.charCodeAt(0), 7),
+      dev: 1,
+    }) as never);
+  }
+
+  it('renames in place but refuses to overwrite another file', async () => {
+    mockFilesystem(false);
     const { result } = setup();
     const id = await openAt(result, '/tmp/notes.md');
 
@@ -211,11 +221,24 @@ describe('useDocuments', () => {
     });
     expect(rename).not.toHaveBeenCalled();
 
-    await act(() => result.current.renameDocument(id, '/tmp/Notes.md'));
-    expect(rename).toHaveBeenCalledWith('/tmp/notes.md', '/tmp/Notes.md');
-
     vi.mocked(exists).mockResolvedValue(false);
     await act(() => result.current.renameDocument(id, '/tmp/ideas.md'));
+    expect(rename).toHaveBeenCalledWith('/tmp/notes.md', '/tmp/ideas.md');
     expect(result.current.getDocument(id)?.path).toBe('/tmp/ideas.md');
+  });
+
+  it('allows case-only renames, unless a differently-cased file exists on a case-sensitive disk', async () => {
+    const { result } = setup();
+    const id = await openAt(result, '/tmp/notes.md');
+
+    mockFilesystem(true);
+    await act(async () => {
+      await expect(result.current.renameDocument(id, '/tmp/Notes.md')).rejects.toThrow('Notes.md already exists');
+    });
+    expect(rename).not.toHaveBeenCalled();
+
+    mockFilesystem(false);
+    await act(() => result.current.renameDocument(id, '/tmp/Notes.md'));
+    expect(rename).toHaveBeenCalledWith('/tmp/notes.md', '/tmp/Notes.md');
   });
 });

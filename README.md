@@ -22,7 +22,7 @@ Clean, distraction-free writing with live markdown rendering
 - Opens instantly from the terminal (`jot notes.md`) or Finder
 - Tabs, with every open file in one window
 - Live markdown rendering, with front matter left untouched
-- Serif, sans, and mono fonts, bundled so they work offline
+- Serif, sans, and mono fonts (serif and mono are bundled, so they work offline)
 - Light, dark, and system themes
 - A keyboard shortcut for everything, shown in the menus
 - Cross-platform (macOS, Windows, Linux)

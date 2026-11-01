@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { exists, readTextFile, rename, writeTextFile } from '@tauri-apps/plugin-fs';
+import { exists, readTextFile, rename, stat, writeTextFile } from '@tauri-apps/plugin-fs';
 import type { EditorHandle } from '../components/Editor';
 import { splitFrontMatter } from '../utils/frontMatter';
 import { getFileName } from '../utils/path';
@@ -12,7 +12,7 @@ export interface MarkdownDocument {
   path: string | null;
   /** The body shown in the editor. Front matter is kept aside and re-attached on save. */
   markdown: string;
-  savedContent: string;
+  savedMarkdown: string;
   frontMatter: string;
 }
 
@@ -21,7 +21,7 @@ interface DocumentsState {
   activeId: number;
 }
 
-export const isDocumentDirty = (doc: MarkdownDocument) => doc.markdown !== doc.savedContent;
+export const isDocumentDirty = (doc: MarkdownDocument) => doc.markdown !== doc.savedMarkdown;
 
 const isPristine = (doc: MarkdownDocument) =>
   doc.path === null && doc.markdown === '' && !isDocumentDirty(doc);
@@ -30,7 +30,17 @@ let nextDocumentId = 1;
 
 function createDocument(path: string | null, content: string): MarkdownDocument {
   const [frontMatter, body] = splitFrontMatter(content);
-  return { id: nextDocumentId++, path, markdown: body, savedContent: body, frontMatter };
+  return { id: nextDocumentId++, path, markdown: body, savedMarkdown: body, frontMatter };
+}
+
+/** True if both paths name the same file, e.g. `notes.md` and `Notes.md` on a case-insensitive disk. */
+async function isSameFile(a: string, b: string): Promise<boolean> {
+  const [infoA, infoB] = await Promise.all([stat(a), stat(b)]);
+  if (infoA.ino === null || infoB.ino === null) {
+    // No inode numbers (Windows), whose filesystems are case-insensitive.
+    return a.toLowerCase() === b.toLowerCase();
+  }
+  return infoA.dev === infoB.dev && infoA.ino === infoB.ino;
 }
 
 function initialState(): DocumentsState {
@@ -72,6 +82,10 @@ export function useDocuments() {
   const editors = useRef(new Map<number, EditorHandle>());
   const editorRefCallbacks = useRef(new Map<number, (handle: EditorHandle | null) => void>());
 
+  const forgetEditor = useCallback((id: number) => {
+    editorRefCallbacks.current.delete(id);
+  }, []);
+
   /** A stable ref callback for document `id`'s editor. */
   const editorRef = useCallback((id: number) => {
     let callback = editorRefCallbacks.current.get(id);
@@ -111,7 +125,7 @@ export function useDocuments() {
   const handleEditorReady = useCallback((id: number, normalized: string) => {
     const doc = getDocument(id);
     if (doc && !isDocumentDirty(doc)) {
-      updateDocument(id, { markdown: normalized, savedContent: normalized });
+      updateDocument(id, { markdown: normalized, savedMarkdown: normalized });
     }
   }, [getDocument, updateDocument]);
 
@@ -154,13 +168,15 @@ export function useDocuments() {
     const active = syncFromEditor(stateRef.current.activeId);
 
     // Reuse the active tab if it's an untouched Untitled, e.g. the one shown at launch.
+    const replaced = active && isPristine(active) ? active.id : null;
     setState((current) => ({
-      documents: active && isPristine(active)
-        ? current.documents.map((d) => (d.id === active.id ? doc : d))
-        : [...current.documents, doc],
+      documents: replaced === null
+        ? [...current.documents, doc]
+        : current.documents.map((d) => (d.id === replaced ? doc : d)),
       activeId: doc.id,
     }));
-  }, [activate, setState, syncFromEditor]);
+    if (replaced !== null) forgetEditor(replaced);
+  }, [activate, forgetEditor, setState, syncFromEditor]);
 
   const openFiles = useCallback(async () => {
     const selected = await open({ multiple: true, filters: FILE_FILTERS });
@@ -173,7 +189,7 @@ export function useDocuments() {
     const doc = syncFromEditor(id);
     if (!doc) return;
     await writeTextFile(path, doc.frontMatter + doc.markdown);
-    updateDocument(id, { path, savedContent: doc.markdown });
+    updateDocument(id, { path, savedMarkdown: doc.markdown });
   }, [syncFromEditor, updateDocument]);
 
   /** Resolves to false if the user cancelled the save dialog. */
@@ -201,9 +217,8 @@ export function useDocuments() {
     const oldPath = getDocument(id)?.path;
     if (!oldPath || oldPath === newPath) return;
 
-    // Case-only renames point at the same file on case-insensitive filesystems.
-    const isCaseOnlyRename = oldPath.toLowerCase() === newPath.toLowerCase();
-    if (!isCaseOnlyRename && (await exists(newPath))) {
+    // A case-only rename finds "itself" on case-insensitive disks; that's not a conflict.
+    if ((await exists(newPath)) && !(await isSameFile(oldPath, newPath))) {
       throw new Error(`${getFileName(newPath)} already exists`);
     }
 
@@ -225,8 +240,8 @@ export function useDocuments() {
         : current.activeId;
       return { documents, activeId };
     });
-    editorRefCallbacks.current.delete(id);
-  }, [setState]);
+    forgetEditor(id);
+  }, [forgetEditor, setState]);
 
   return {
     documents: state.documents,

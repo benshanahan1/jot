@@ -1,7 +1,7 @@
 export const isMac = () => navigator.platform.toUpperCase().includes('MAC');
 
 /** Formats a shortcut like `Mod+Shift+S` for display: `⇧⌘S` on macOS, `Ctrl+Shift+S` elsewhere. */
-export function formatShortcut(shortcut: string): string {
+function formatShortcut(shortcut: string): string {
   const parts = shortcut.split('+');
   if (!isMac()) return parts.map((part) => (part === 'Mod' ? 'Ctrl' : part)).join('+');
 

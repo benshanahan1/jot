@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { isDocumentDirty, type MarkdownDocument } from '../hooks/useDocuments';
-import { getFileName, getFileStem } from '../utils/path';
+import { getDisplayName, getFileStem } from '../utils/path';
 import { withShortcut } from '../utils/shortcuts';
 
 interface TabBarProps {
@@ -95,7 +95,7 @@ export function TabBar({
                   onCancel={onCancelRename}
                 />
               ) : (
-                <span className="tab-label">{doc.path ? getFileName(doc.path) : 'Untitled'}</span>
+                <span className="tab-label">{getDisplayName(doc.path)}</span>
               )}
               <button
                 type="button"

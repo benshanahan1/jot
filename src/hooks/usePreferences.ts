@@ -1,22 +1,26 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
-export type FontFamily = 'serif' | 'sans' | 'mono';
-export type WidthMode = 'wide' | 'narrow';
-export type ThemeMode = 'system' | 'light' | 'dark';
-export type ResolvedTheme = 'light' | 'dark';
+export const FONT_FAMILIES = ['serif', 'sans', 'mono'] as const;
+export const THEME_MODES = ['system', 'light', 'dark'] as const;
+const WIDTH_MODES = ['narrow', 'wide'] as const;
 
-export interface Preferences {
+type FontFamily = (typeof FONT_FAMILIES)[number];
+type ThemeMode = (typeof THEME_MODES)[number];
+type WidthMode = (typeof WIDTH_MODES)[number];
+type ResolvedTheme = 'light' | 'dark';
+
+interface Preferences {
   fontFamily: FontFamily;
   widthMode: WidthMode;
   themeMode: ThemeMode;
   textScale: number;
 }
 
-export const MIN_TEXT_SCALE = 0.6;
-export const MAX_TEXT_SCALE = 2.2;
+const MIN_TEXT_SCALE = 0.6;
+const MAX_TEXT_SCALE = 2.2;
 const TEXT_SCALE_STEP = 0.1;
 
-export const DEFAULT_PREFERENCES: Preferences = {
+const DEFAULT_PREFERENCES: Preferences = {
   fontFamily: 'serif',
   widthMode: 'narrow',
   themeMode: 'system',
@@ -37,9 +41,9 @@ function loadPreferences(): Preferences {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
     return {
-      fontFamily: oneOf(stored.fontFamily, ['serif', 'sans', 'mono'], DEFAULT_PREFERENCES.fontFamily),
-      widthMode: oneOf(stored.widthMode, ['wide', 'narrow'], DEFAULT_PREFERENCES.widthMode),
-      themeMode: oneOf(stored.themeMode, ['system', 'light', 'dark'], DEFAULT_PREFERENCES.themeMode),
+      fontFamily: oneOf(stored.fontFamily, FONT_FAMILIES, DEFAULT_PREFERENCES.fontFamily),
+      widthMode: oneOf(stored.widthMode, WIDTH_MODES, DEFAULT_PREFERENCES.widthMode),
+      themeMode: oneOf(stored.themeMode, THEME_MODES, DEFAULT_PREFERENCES.themeMode),
       textScale: typeof stored.textScale === 'number'
         ? clampTextScale(stored.textScale)
         : DEFAULT_PREFERENCES.textScale,

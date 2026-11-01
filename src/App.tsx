@@ -8,8 +8,8 @@ import { TabBar } from "./components/TabBar";
 import { Toast } from "./components/Toast";
 import { isDocumentDirty, useDocuments } from "./hooks/useDocuments";
 import { useHotkeys } from "./hooks/useHotkeys";
-import { usePreferences, useResolvedTheme } from "./hooks/usePreferences";
-import { abbreviateHome, getFileName, getFileStem, isValidFileStem, replaceFileStem } from "./utils/path";
+import { FONT_FAMILIES, THEME_MODES, usePreferences, useResolvedTheme } from "./hooks/usePreferences";
+import { abbreviateHome, getDisplayName, getFileName, getFileStem, isValidFileStem, replaceFileStem } from "./utils/path";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
@@ -82,8 +82,7 @@ function App() {
     if (!hasUnsavedChanges(id)) return true;
 
     activate(id);
-    const path = getDocument(id)?.path;
-    const name = path ? getFileName(path) : 'Untitled';
+    const name = getDisplayName(getDocument(id)?.path ?? null);
 
     if (!isTauri) return window.confirm(`Discard unsaved changes to ${name}?`);
 
@@ -144,7 +143,7 @@ function App() {
     if (!path || !stem || stem === getFileStem(path)) return;
 
     if (!isValidFileStem(stem)) {
-      showToast('File names can’t contain slashes');
+      showToast(`“${stem}” isn’t a valid file name`);
       return;
     }
 
@@ -176,12 +175,12 @@ function App() {
     'file.rename': () => handleStartRename(getActiveId()),
     'file.close_tab': () => handleCloseTab(getActiveId()),
     'file.close_window': closeWindow,
-    'view.theme.system': () => updatePreferences({ themeMode: 'system' }),
-    'view.theme.light': () => updatePreferences({ themeMode: 'light' }),
-    'view.theme.dark': () => updatePreferences({ themeMode: 'dark' }),
-    'view.font.serif': () => updatePreferences({ fontFamily: 'serif' }),
-    'view.font.sans': () => updatePreferences({ fontFamily: 'sans' }),
-    'view.font.mono': () => updatePreferences({ fontFamily: 'mono' }),
+    ...Object.fromEntries(THEME_MODES.map((themeMode) => [
+      `view.theme.${themeMode}`, () => updatePreferences({ themeMode }),
+    ])),
+    ...Object.fromEntries(FONT_FAMILIES.map((fontFamily) => [
+      `view.font.${fontFamily}`, () => updatePreferences({ fontFamily }),
+    ])),
     'view.wide': () => updatePreferences({
       widthMode: preferences.widthMode === 'wide' ? 'narrow' : 'wide',
     }),
@@ -238,7 +237,7 @@ function App() {
     // Files to open arrive from argv, from a later `jot` invocation, or from Finder.
     const openPendingFiles = () => attempt("Couldn't open file", async () => {
       const paths = await invoke<string[]>('take_pending_files');
-      for (const path of paths ?? []) await openPath(path);
+      for (const path of paths) await openPath(path);
     });
 
     // Listen before the first claim so a request arriving in between isn't missed.
@@ -279,9 +278,9 @@ function App() {
   }, [isTauri, preferences.themeMode, preferences.fontFamily, preferences.widthMode, viewMenuClicks]);
 
   useEffect(() => {
-    const displayPath = activePath
-      ? (homePath ? abbreviateHome(activePath, homePath) : activePath)
-      : 'Untitled';
+    const displayPath = activePath && homePath
+      ? abbreviateHome(activePath, homePath)
+      : activePath ?? getDisplayName(null);
     const title = `${displayPath}${activeIsDirty ? ' *' : ''}`;
 
     document.title = title;

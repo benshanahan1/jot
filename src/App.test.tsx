@@ -107,7 +107,7 @@ describe('App', () => {
       id: 1,
       path: '/tmp/note.md',
       markdown: '# note',
-      savedContent: '# note',
+      savedMarkdown: '# note',
       frontMatter: '',
     };
     fileState = {
@@ -229,7 +229,7 @@ describe('App', () => {
     beforeEach(() => {
       vi.mocked(fileState.hasUnsavedChanges).mockReturnValue(true);
       // A second tab, so closing a tab doesn't close the window.
-      const other: MarkdownDocument = { id: 2, path: null, markdown: '', savedContent: '', frontMatter: '' };
+      const other: MarkdownDocument = { id: 2, path: null, markdown: '', savedMarkdown: '', frontMatter: '' };
       vi.mocked(fileState.getDocuments).mockReturnValue([...fileState.documents, other]);
     });
 

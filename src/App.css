@@ -4,6 +4,11 @@
   line-height: 24px;
   font-weight: 400;
 
+  --font-sans: Inter, Avenir, Helvetica, Arial, sans-serif;
+  --font-serif: 'EB Garamond Variable', Garamond, 'Times New Roman', serif;
+  --font-mono: 'Inconsolata Variable', 'Courier New', monospace;
+  --font-code: 'JetBrains Mono Variable', 'Courier New', monospace;
+
   /* Slate palette: Light Grey page, Charcoal ink, ultramarine accent, highlighter selection. */
   --color-bg: #f0f0f0;
   --color-text: #21262e;
@@ -30,7 +35,6 @@
   --color-text: #f0f0f0;
   --chrome-bg: #1a1e24;
   --rule: #3a4451;
-  --muted: #828b98;
   --hover: rgba(240, 240, 240, 0.07);
   --accent: #8c96ff;
   --selection: rgba(255, 214, 0, 0.3);

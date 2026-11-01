@@ -72,7 +72,7 @@ export function Editor({ initialValue, onReady, onChange, textScale, active, ref
 
     crepe.on((listener) => {
       listener.markdownUpdated((_, markdown) => {
-        // Debounced updates can land after this editor was swapped out for another file.
+        // Debounced updates can land after the editor (and its tab) has been closed.
         if (!disposed) callbacksRef.current.onChange(markdown);
       });
     });

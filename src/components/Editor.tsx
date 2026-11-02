@@ -3,6 +3,7 @@ import { Crepe } from '@milkdown/crepe';
 import { editorViewCtx } from '@milkdown/kit/core';
 import { EditorView } from '@codemirror/view';
 import '@milkdown/crepe/theme/frame.css';
+import { codeHighlighting } from './codeHighlighting';
 
 export interface EditorHandle {
   /** Serializes the live document. Undefined until the editor has finished mounting. */
@@ -67,6 +68,7 @@ export function Editor({ initialValue, onReady, onChange, textScale, active, ref
       defaultValue: initialValue,
       featureConfigs: {
         [Crepe.Feature.Placeholder]: { text: 'Start writing', mode: 'doc' },
+        [Crepe.Feature.CodeMirror]: { theme: codeHighlighting },
       },
     });
 

@@ -62,6 +62,14 @@
   --crepe-color-selected: #d6d9df;
   --crepe-color-inline-area: #d9dce1;
   --inline-code-bg: rgba(33, 38, 46, 0.06);
+  /* Code block syntax colors (see codeHighlighting.ts) */
+  --code-keyword: #2b3cf5;
+  --code-string: #2d7a3a;
+  --code-constant: #b04f0b;
+  --code-function: #7a3fc4;
+  --code-type: #0e7383;
+  --code-comment: #6f7784;
+  --code-invalid: #c0362c;
 }
 
 /* Mirrors frame-dark.css in the slate palette. (Importing frame-dark.css directly would
@@ -86,6 +94,13 @@
     0px 1px 2px 0px rgba(255, 255, 255, 0.3),
     0px 2px 6px 2px rgba(255, 255, 255, 0.15);
   --inline-code-bg: rgba(255, 255, 255, 0.1);
+  --code-keyword: #8c96ff;
+  --code-string: #9dcc8a;
+  --code-constant: #e8a36a;
+  --code-function: #c7a6ff;
+  --code-type: #6fcfd8;
+  --code-comment: #8b94a1;
+  --code-invalid: #ff7a70;
 }
 
 /* Square corners throughout, including Crepe's menus and toolbars. */
@@ -186,6 +201,15 @@
 .editor-wrapper .milkdown .ProseMirror code {
   padding: 0.2em 0.4em;
   background-color: var(--inline-code-bg);
+}
+
+/* CodeMirror's base theme assumes a light background; follow the app theme instead. */
+.milkdown .milkdown-code-block .cm-cursor {
+  border-left-color: var(--color-text);
+}
+
+.milkdown .milkdown-code-block .cm-selectionBackground {
+  background: var(--selection) !important;
 }
 
 /* Theme code-block active line and language/code-assist controls consistently. */

@@ -1,17 +1,6 @@
-/* Import fonts */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inconsolata:wght@400;500;600&display=swap');
-
-/* Font variables */
-:root {
-  --font-sans: Inter, Avenir, Helvetica, Arial, sans-serif;
-  --font-serif: 'EB Garamond', Garamond, 'Times New Roman', serif;
-  --font-mono: 'Inconsolata', 'Courier New', monospace;
-  --font-code: 'JetBrains Mono', 'Courier New', monospace;
-  --font-prose: var(--font-serif); /* Default to serif */
-}
-
 /* Editor container - full height */
 .editor-container {
+  box-sizing: border-box;
   flex: 1;
   overflow: auto;
   padding: 0.5rem 1rem 1rem;
@@ -20,119 +9,153 @@
 
 /* Width modes */
 .width-narrow .editor-container {
-  width: 800px;
-  max-width: calc(100vw - 3rem); /* Don't overflow on small screens */
+  width: calc(800px + 3rem); /* An 800px column plus padding */
+  max-width: 100%;
   margin: 0 auto;
   padding: 1rem 1.5rem 2rem;
 }
 
 .width-wide .editor-container {
-  width: 100%;
-  padding: 0.75rem 3rem 1.5rem;
+  /* Crepe's own side padding already leaves room for the block drag handle. */
+  padding: 0.75rem 0 1.5rem;
 }
 
-/* Keep code rendering on a fixed monospace family, independent of prose font mode. */
-.milkdown pre,
-.milkdown pre code,
-.milkdown code,
-.milkdown .milkdown-code-block .cm-editor,
-.milkdown .milkdown-code-block .cm-content,
-.milkdown .milkdown-code-block .cm-line,
-.milkdown .milkdown-code-block .cm-gutter {
-  font-family: var(--font-code) !important;
-  font-size: 0.9em;
-  line-height: 1.6;
-}
-
-/* Ensure inline code has proper spacing */
-.milkdown code {
-  padding: 0.2em 0.4em;
-  border-radius: 3px;
-}
-
-/* Apply font based on selection */
-.font-serif .milkdown .ProseMirror,
-.font-serif .milkdown .ProseMirror h1,
-.font-serif .milkdown .ProseMirror h2,
-.font-serif .milkdown .ProseMirror h3,
-.font-serif .milkdown .ProseMirror h4,
-.font-serif .milkdown .ProseMirror h5,
-.font-serif .milkdown .ProseMirror h6,
-.font-serif .milkdown .ProseMirror p,
-.font-serif .milkdown .ProseMirror li,
-.font-serif .milkdown .ProseMirror blockquote {
-  font-family: var(--font-serif) !important;
-  line-height: 1.75;
-}
-
-.font-serif .milkdown .ProseMirror {
-  font-size: calc(1.05rem * var(--editor-scale, 1));
-}
-
-.font-sans .milkdown .ProseMirror,
-.font-sans .milkdown .ProseMirror h1,
-.font-sans .milkdown .ProseMirror h2,
-.font-sans .milkdown .ProseMirror h3,
-.font-sans .milkdown .ProseMirror h4,
-.font-sans .milkdown .ProseMirror h5,
-.font-sans .milkdown .ProseMirror h6,
-.font-sans .milkdown .ProseMirror p,
-.font-sans .milkdown .ProseMirror li,
-.font-sans .milkdown .ProseMirror blockquote {
-  font-family: var(--font-sans) !important;
-  line-height: 1.65;
-}
-
-.font-sans .milkdown .ProseMirror {
-  font-size: calc(1rem * var(--editor-scale, 1));
-}
-
-.font-mono .milkdown .ProseMirror,
-.font-mono .milkdown .ProseMirror h1,
-.font-mono .milkdown .ProseMirror h2,
-.font-mono .milkdown .ProseMirror h3,
-.font-mono .milkdown .ProseMirror h4,
-.font-mono .milkdown .ProseMirror h5,
-.font-mono .milkdown .ProseMirror h6,
-.font-mono .milkdown .ProseMirror p,
-.font-mono .milkdown .ProseMirror li,
-.font-mono .milkdown .ProseMirror blockquote {
-  font-family: var(--font-mono) !important;
-  line-height: 1.6;
-  letter-spacing: -0.01em;
-}
-
-.font-mono .milkdown .ProseMirror {
-  font-size: calc(0.95rem * var(--editor-scale, 1));
-}
-
+/* Prose font modes. Body text is --editor-font-size, set on .editor-wrapper below. */
 .font-serif {
+  --font-prose: var(--font-serif);
+  --prose-line-height: 1.75;
   --editor-base-size: 16.8px;
-  --editor-base-line: 29.4px;
 }
 
 .font-sans {
+  --font-prose: var(--font-sans);
+  --prose-line-height: 1.65;
   --editor-base-size: 16px;
-  --editor-base-line: 26.4px;
 }
 
 .font-mono {
+  --font-prose: var(--font-mono);
+  --prose-line-height: 1.6;
   --editor-base-size: 15.2px;
-  --editor-base-line: 24.3px;
+  --prose-letter-spacing: -0.01em;
 }
 
-.editor-wrapper .milkdown .ProseMirror p,
-.editor-wrapper .milkdown .ProseMirror blockquote {
-  font-size: calc(var(--editor-base-size, 16px) * var(--editor-scale, 1));
-  line-height: calc(var(--editor-base-line, 24px) * var(--editor-scale, 1));
+.editor-wrapper {
+  /* --editor-scale is set inline from the zoom level. */
+  --editor-font-size: calc(var(--editor-base-size) * var(--editor-scale));
+}
+
+/* Crepe theme. Scoped under .editor-wrapper to outrank Crepe's frame.css, which loads later. */
+.editor-wrapper .milkdown {
+  --crepe-font-default: var(--font-sans);
+  --crepe-font-title: var(--font-prose);
+  --crepe-font-code: var(--font-code);
+  --crepe-color-inline-code: var(--accent);
+  --crepe-color-background: var(--color-bg);
+  --crepe-color-on-background: var(--color-text);
+  --crepe-color-surface: var(--color-bg);
+  --crepe-color-surface-low: var(--color-bg);
+  --crepe-color-on-surface: #21262e;
+  --crepe-color-on-surface-variant: #3a4451;
+  --crepe-color-outline: #a3aab5;
+  --crepe-color-hover: #e2e4e8;
+  --crepe-color-selected: #d6d9df;
+  --crepe-color-inline-area: #d9dce1;
+  --inline-code-bg: rgba(33, 38, 46, 0.06);
+  /* Code block syntax colors (see codeHighlighting.ts) */
+  --code-keyword: #2b3cf5;
+  --code-string: #2d7a3a;
+  --code-constant: #b04f0b;
+  --code-function: #7a3fc4;
+  --code-type: #0e7383;
+  --code-comment: #6f7784;
+  --code-invalid: #c0362c;
+}
+
+/* Mirrors frame-dark.css in the slate palette. (Importing frame-dark.css directly would
+   override the light palette in both themes.) */
+:root[data-theme='dark'] .editor-wrapper .milkdown {
+  --crepe-color-on-surface: #dfe2e6;
+  --crepe-color-on-surface-variant: #a6adb8;
+  --crepe-color-outline: #5d6674;
+  --crepe-color-primary: #b9c0cb;
+  --crepe-color-secondary: #3a4451;
+  --crepe-color-on-secondary: #dfe2e6;
+  --crepe-color-inverse: #f0f0f0;
+  --crepe-color-on-inverse: #21262e;
+  --crepe-color-error: #ff6666;
+  --crepe-color-hover: #2a303a;
+  --crepe-color-selected: #343d4a;
+  --crepe-color-inline-area: #2c333d;
+  --crepe-shadow-1:
+    0px 1px 2px 0px rgba(255, 255, 255, 0.3),
+    0px 1px 3px 1px rgba(255, 255, 255, 0.15);
+  --crepe-shadow-2:
+    0px 1px 2px 0px rgba(255, 255, 255, 0.3),
+    0px 2px 6px 2px rgba(255, 255, 255, 0.15);
+  --inline-code-bg: rgba(255, 255, 255, 0.1);
+  --code-keyword: #8c96ff;
+  --code-string: #9dcc8a;
+  --code-constant: #e8a36a;
+  --code-function: #c7a6ff;
+  --code-type: #6fcfd8;
+  --code-comment: #8b94a1;
+  --code-invalid: #ff7a70;
+}
+
+/* Square corners throughout, including Crepe's menus and toolbars. */
+.milkdown,
+.milkdown * {
+  border-radius: 0 !important;
+}
+
+/* Prose */
+.editor-wrapper .milkdown .ProseMirror {
+  font-size: var(--editor-font-size);
+  line-height: var(--prose-line-height);
+  letter-spacing: var(--prose-letter-spacing, normal);
+  caret-color: var(--accent);
+}
+
+.editor-wrapper .milkdown .ProseMirror,
+.editor-wrapper .milkdown .ProseMirror :is(p, li) {
+  font-family: var(--font-prose) !important;
+}
+
+/* Crepe gives these fixed pixel sizes; follow the font mode and zoom instead. */
+.editor-wrapper .milkdown .ProseMirror p {
+  font-size: var(--editor-font-size);
+  line-height: var(--prose-line-height);
 }
 
 .editor-wrapper .milkdown .ProseMirror li {
-  font-size: calc(var(--editor-base-size, 16px) * var(--editor-scale, 1));
-  line-height: calc(var(--editor-base-size, 16px) * 1.5 * var(--editor-scale, 1));
+  font-size: var(--editor-font-size);
+  line-height: 1.5;
 }
 
-/* Milkdown renders paragraphs inside list items; remove extra block padding there. */
+.editor-wrapper .milkdown .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
+  font-size: calc(var(--heading-size) * var(--editor-scale));
+  line-height: calc(var(--heading-line) * var(--editor-scale));
+}
+
+.editor-wrapper .milkdown .ProseMirror h1 { --heading-size: 42px; --heading-line: 50px; }
+.editor-wrapper .milkdown .ProseMirror h2 { --heading-size: 36px; --heading-line: 44px; }
+.editor-wrapper .milkdown .ProseMirror h3 { --heading-size: 32px; --heading-line: 40px; }
+.editor-wrapper .milkdown .ProseMirror h4 { --heading-size: 28px; --heading-line: 36px; }
+.editor-wrapper .milkdown .ProseMirror h5 { --heading-size: 24px; --heading-line: 32px; }
+.editor-wrapper .milkdown .ProseMirror h6 { --heading-size: 18px; --heading-line: 28px; }
+
+.editor-wrapper .milkdown .ProseMirror a {
+  text-decoration-color: var(--accent);
+  text-underline-offset: 0.15em;
+}
+
+/* Crepe's own selection rule would otherwise win over the app-wide highlighter color. */
+.editor-wrapper .milkdown .ProseMirror *::selection {
+  background: var(--selection);
+}
+
+/* Lists. Milkdown renders paragraphs inside list items; remove extra block padding there. */
 .editor-wrapper .milkdown .ProseMirror li p {
   padding: 0;
 }
@@ -144,7 +167,7 @@
 
 .editor-wrapper .milkdown .milkdown-list-item-block li .label-wrapper {
   height: auto;
-  min-height: calc(var(--editor-base-size, 16px) * 1.5 * var(--editor-scale, 1));
+  min-height: 1.5em;
   align-items: flex-start;
   padding-top: 1px;
 }
@@ -154,86 +177,39 @@
   min-width: 24px;
   width: auto;
   padding: 0;
-  line-height: calc(var(--editor-base-size, 16px) * 1.5 * var(--editor-scale, 1));
+  line-height: 1.5;
   font-family: inherit !important;
-  font-size: calc(var(--editor-base-size, 16px) * var(--editor-scale, 1));
+  font-size: var(--editor-font-size);
 }
 
-.editor-wrapper .milkdown .ProseMirror h1 {
-  font-size: calc(42px * var(--editor-scale, 1));
-  line-height: calc(50px * var(--editor-scale, 1));
+/* Code: a fixed monospace family, independent of the prose font mode. */
+.milkdown code,
+.milkdown .milkdown-code-block .cm-editor,
+.milkdown .milkdown-code-block .cm-content,
+.milkdown .milkdown-code-block .cm-line,
+.milkdown .milkdown-code-block .cm-gutter {
+  font-family: var(--font-code) !important;
+  line-height: 1.6;
 }
 
-.editor-wrapper .milkdown .ProseMirror h2 {
-  font-size: calc(36px * var(--editor-scale, 1));
-  line-height: calc(44px * var(--editor-scale, 1));
+/* Size only the outermost code element; nested `em` sizes would compound. */
+.milkdown code,
+.milkdown .milkdown-code-block .cm-editor {
+  font-size: 0.9em;
 }
 
-.editor-wrapper .milkdown .ProseMirror h3 {
-  font-size: calc(32px * var(--editor-scale, 1));
-  line-height: calc(40px * var(--editor-scale, 1));
+.editor-wrapper .milkdown .ProseMirror code {
+  padding: 0.2em 0.4em;
+  background-color: var(--inline-code-bg);
 }
 
-.editor-wrapper .milkdown .ProseMirror h4 {
-  font-size: calc(28px * var(--editor-scale, 1));
-  line-height: calc(36px * var(--editor-scale, 1));
+/* CodeMirror's base theme assumes a light background; follow the app theme instead. */
+.milkdown .milkdown-code-block .cm-cursor {
+  border-left-color: var(--color-text);
 }
 
-.editor-wrapper .milkdown .ProseMirror h5 {
-  font-size: calc(24px * var(--editor-scale, 1));
-  line-height: calc(32px * var(--editor-scale, 1));
-}
-
-.editor-wrapper .milkdown .ProseMirror h6 {
-  font-size: calc(18px * var(--editor-scale, 1));
-  line-height: calc(28px * var(--editor-scale, 1));
-}
-
-/* Improve code block appearance */
-.milkdown pre {
-  padding: 1em;
-  border-radius: 6px;
-  overflow-x: auto;
-}
-
-:root[data-theme='dark'] .editor-container {
-  color: #e4e4e7;
-}
-
-:root[data-theme='dark'] .milkdown {
-  --crepe-color-background: #1a1a1a;
-  --crepe-color-on-background: #e6e6e6;
-  --crepe-color-surface: #1a1a1a;
-  --crepe-color-surface-low: #1a1a1a;
-  --crepe-color-on-surface: #d1d1d1;
-  --crepe-color-on-surface-variant: #a9a9a9;
-}
-
-:root[data-theme='dark'] .milkdown code {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-:root[data-theme='light'] .editor-container {
-  color: #18181b;
-}
-
-:root[data-theme='light'] .milkdown {
-  --crepe-color-background: #f6f6f6;
-  --crepe-color-on-background: #111111;
-  --crepe-color-surface: #f6f6f6;
-  --crepe-color-surface-low: #f6f6f6;
-  --crepe-color-on-surface: #1c1c1c;
-  --crepe-color-on-surface-variant: #4d4d4d;
-}
-
-:root[data-theme='light'] .milkdown code {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-:root[data-theme='dark'] .milkdown,
-:root[data-theme='light'] .milkdown {
-  color: var(--crepe-color-on-background) !important;
-  background-color: var(--crepe-color-background) !important;
+.milkdown .milkdown-code-block .cm-selectionBackground {
+  background: var(--selection) !important;
 }
 
 /* Theme code-block active line and language/code-assist controls consistently. */

@@ -1,296 +1,327 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import "./fonts.css";
 import "./App.css";
 import "./editor.css";
-import "./tooltip.css";
 import "./toast.css";
 import { Editor } from "./components/Editor";
-import { EditorToolbar } from "./components/EditorToolbar";
+import { TabBar } from "./components/TabBar";
 import { Toast } from "./components/Toast";
-import { useMarkdownFile } from "./hooks/useMarkdownFile";
+import { isDocumentDirty, useDocuments } from "./hooks/useDocuments";
 import { useHotkeys } from "./hooks/useHotkeys";
+import { FONT_FAMILIES, THEME_MODES, usePreferences, useResolvedTheme } from "./hooks/usePreferences";
+import { abbreviateHome, getDisplayName, getFileName, getFileStem, isValidFileStem, replaceFileStem } from "./utils/path";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { homeDir } from "@tauri-apps/api/path";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { message } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
-export type FontFamily = 'serif' | 'sans' | 'mono';
-export type WidthMode = 'wide' | 'narrow';
-export type ThemeMode = 'system' | 'light' | 'dark';
-type ResolvedTheme = 'light' | 'dark';
-const MIN_TEXT_SCALE = 0.6;
-const MAX_TEXT_SCALE = 2.2;
-const TEXT_SCALE_STEP = 0.1;
-const DEFAULT_TEXT_SCALE = 1.15;
+const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-const getSystemTheme = (): ResolvedTheme => {
-  if (typeof window === 'undefined') return 'light';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-};
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 function App() {
-  const [fontFamily, setFontFamily] = useState<FontFamily>('serif');
-  const [widthMode, setWidthMode] = useState<WidthMode>('narrow');
-  const [themeMode, setThemeMode] = useState<ThemeMode>('system');
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(getSystemTheme);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [textScale, setTextScale] = useState(DEFAULT_TEXT_SCALE);
-  const isTauriRuntime = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  const isTauri = isTauriRuntime();
+  const [toast, setToast] = useState<{ id: number; message: string } | null>(null);
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [homePath, setHomePath] = useState<string | null>(null);
+  // Bumped after View menu clicks so check marks are re-synced even when nothing changed.
+  const [viewMenuClicks, setViewMenuClicks] = useState(0);
+
+  const { preferences, updatePreferences, zoomIn, zoomOut, resetZoom } = usePreferences();
+  const resolvedTheme = useResolvedTheme(preferences.themeMode);
 
   const {
-    markdown,
+    documents,
+    activeId,
+    getDocument,
+    getDocuments,
+    getActiveId,
+    editorRef,
     setMarkdown,
-    currentPath,
-    isDirty,
-    fileVersion,
-    openFile,
-    openFileAtPath,
-    saveFile,
-    saveFileAs,
-    newFile,
-    renameFile,
-  } = useMarkdownFile();
+    hasUnsavedChanges,
+    handleEditorReady,
+    activate,
+    activateRelative,
+    activateIndex,
+    newDocument,
+    openPath,
+    openFiles,
+    saveDocument,
+    saveDocumentAs,
+    renameDocument,
+    closeDocument,
+  } = useDocuments();
 
-  const handleNewFile = useCallback(() => {
-    // No need to check isDirty for now - we'll implement that later
-    newFile();
-  }, [newFile]);
+  const activeDocument = documents.find((doc) => doc.id === activeId);
+  const activePath = activeDocument?.path ?? null;
+  const activeIsDirty = activeDocument ? isDocumentDirty(activeDocument) : false;
 
-  const handleOpenFile = useCallback(async () => {
-    // No need to check isDirty for now - we'll implement that later
-    await openFile();
-  }, [openFile]);
+  const showToast = useCallback((text: string) => {
+    setToast({ id: Date.now(), message: text });
+  }, []);
 
-  const handleSave = useCallback(async () => {
-    await saveFile();
-  }, [saveFile]);
+  const dismissToast = useCallback(() => setToast(null), []);
 
-  const handleSaveAs = useCallback(async () => {
-    await saveFileAs();
-  }, [saveFileAs]);
-
-  const handleRename = useCallback(async (newPath: string) => {
+  /** Runs a file action, reporting failures in a toast instead of rejecting. */
+  const attempt = useCallback(async <T,>(failureLabel: string, action: () => Promise<T>) => {
     try {
-      await renameFile(newPath);
-      const fileName = newPath.split(/[\\/]/).pop();
-      setToastMessage(`Renamed to ${fileName}`);
+      return await action();
     } catch (error) {
-      setToastMessage(`Failed to rename: ${error}`);
+      console.error(`${failureLabel}:`, error);
+      showToast(`${failureLabel}: ${describeError(error)}`);
+      return undefined;
     }
-  }, [renameFile]);
+  }, [showToast]);
 
-  const handleRenameFromMenu = useCallback(async () => {
-    if (!currentPath) return;
+  /** Asks to save a document's unsaved changes. Resolves to true if it's safe to close. */
+  const confirmClose = useCallback(async (id: number): Promise<boolean> => {
+    if (!hasUnsavedChanges(id)) return true;
 
-    const pathParts = currentPath.split(/[\\/]/);
-    const fullName = pathParts[pathParts.length - 1];
-    const lastDot = fullName.lastIndexOf('.');
-    const currentName = lastDot > 0 ? fullName.substring(0, lastDot) : fullName;
-    const extension = lastDot > 0 ? fullName.substring(lastDot) : '';
+    activate(id);
+    const name = getDisplayName(getDocument(id)?.path ?? null);
 
-    const nextName = window.prompt('Rename file', currentName);
-    if (!nextName) return;
+    if (!isTauri) return window.confirm(`Discard unsaved changes to ${name}?`);
 
-    const trimmed = nextName.trim();
-    if (!trimmed || trimmed === currentName) return;
+    const choice = await message(`Do you want to save the changes you made to ${name}?`, {
+      title: 'Unsaved changes',
+      kind: 'warning',
+      buttons: { yes: 'Save', no: "Don't Save", cancel: 'Cancel' },
+    });
 
-    pathParts[pathParts.length - 1] = `${trimmed}${extension}`;
-    await handleRename(pathParts.join('/'));
-  }, [currentPath, handleRename]);
+    if (choice === 'Save') return (await attempt("Couldn't save", () => saveDocument(id))) ?? false;
+    return choice === "Don't Save";
+  }, [activate, attempt, getDocument, hasUnsavedChanges, isTauri, saveDocument]);
 
-  const handleZoomIn = useCallback(() => {
-    setTextScale((current) => Math.min(MAX_TEXT_SCALE, Number((current + TEXT_SCALE_STEP).toFixed(2))));
+  /** Asks about every unsaved document in turn. Resolves to false if the user cancels any. */
+  const confirmCloseAll = useCallback(async (): Promise<boolean> => {
+    for (const doc of getDocuments()) {
+      if (!(await confirmClose(doc.id))) return false;
+    }
+    return true;
+  }, [confirmClose, getDocuments]);
+
+  const closeWindow = useCallback(() => {
+    // Goes through onCloseRequested below, which checks for unsaved changes.
+    void getCurrentWindow().close();
   }, []);
 
-  const handleZoomOut = useCallback(() => {
-    setTextScale((current) => Math.max(MIN_TEXT_SCALE, Number((current - TEXT_SCALE_STEP).toFixed(2))));
-  }, []);
+  const handleCloseTab = useCallback(async (id: number) => {
+    // Closing the last tab closes the window (and quits), like a browser.
+    if (isTauri && getDocuments().length === 1) {
+      closeWindow();
+      return;
+    }
+    if (await confirmClose(id)) closeDocument(id);
+  }, [closeDocument, closeWindow, confirmClose, getDocuments, isTauri]);
 
-  const handleZoomReset = useCallback(() => {
-    setTextScale(DEFAULT_TEXT_SCALE);
-  }, []);
+  const handleOpen = useCallback(() => attempt("Couldn't open file", openFiles), [attempt, openFiles]);
+
+  const handleSave = useCallback(
+    () => attempt("Couldn't save", () => saveDocument(getActiveId())),
+    [attempt, getActiveId, saveDocument],
+  );
+
+  const handleSaveAs = useCallback(
+    () => attempt("Couldn't save", () => saveDocumentAs(getActiveId())),
+    [attempt, getActiveId, saveDocumentAs],
+  );
+
+  const handleStartRename = useCallback((id: number) => {
+    // An untitled document has nothing on disk to rename; naming it means saving it.
+    if (getDocument(id)?.path) setRenamingId(id);
+    else void attempt("Couldn't save", () => saveDocumentAs(id));
+  }, [attempt, getDocument, saveDocumentAs]);
+
+  const handleRename = useCallback(async (id: number, newStem: string) => {
+    setRenamingId(null);
+    const path = getDocument(id)?.path;
+    const stem = newStem.trim();
+    if (!path || !stem || stem === getFileStem(path)) return;
+
+    if (!isValidFileStem(stem)) {
+      showToast(`“${stem}” isn’t a valid file name`);
+      return;
+    }
+
+    const newPath = replaceFileStem(path, stem);
+    await attempt("Couldn't rename", async () => {
+      await renameDocument(id, newPath);
+      showToast(`Renamed to ${getFileName(newPath)}`);
+    });
+  }, [attempt, getDocument, renameDocument, showToast]);
+
+  const handleCancelRename = useCallback(() => setRenamingId(null), []);
 
   useHotkeys({
-    onNew: handleNewFile,
-    onOpen: handleOpenFile,
-    onSave: handleSave,
-    onSaveAs: handleSaveAs,
-    onZoomIn: handleZoomIn,
-    onZoomOut: handleZoomOut,
-    onZoomReset: handleZoomReset,
-    enabled: true,
-    enableFileShortcuts: !isTauriRuntime,
-    enableZoomShortcuts: true,
+    onNextTab: () => activateRelative(1),
+    onPreviousTab: () => activateRelative(-1),
+    onSelectTab: activateIndex,
+    onZoomIn: zoomIn,
+    onZoomOut: zoomOut,
+    onZoomReset: resetZoom,
+  });
+
+  // Keyed by the menu item ids in src-tauri/src/lib.rs.
+  const menuActions: Record<string, () => unknown> = {
+    'app.quit': closeWindow,
+    'file.new': newDocument,
+    'file.open': handleOpen,
+    'file.save': handleSave,
+    'file.save_as': handleSaveAs,
+    'file.rename': () => handleStartRename(getActiveId()),
+    'file.close_tab': () => handleCloseTab(getActiveId()),
+    'file.close_window': closeWindow,
+    ...Object.fromEntries(THEME_MODES.map((themeMode) => [
+      `view.theme.${themeMode}`, () => updatePreferences({ themeMode }),
+    ])),
+    ...Object.fromEntries(FONT_FAMILIES.map((fontFamily) => [
+      `view.font.${fontFamily}`, () => updatePreferences({ fontFamily }),
+    ])),
+    'view.wide': () => updatePreferences({
+      widthMode: preferences.widthMode === 'wide' ? 'narrow' : 'wide',
+    }),
+    'view.zoom_in': zoomIn,
+    'view.zoom_out': zoomOut,
+    'view.zoom_reset': resetZoom,
+    'window.next_tab': () => activateRelative(1),
+    'window.previous_tab': () => activateRelative(-1),
+    'help.docs': () => openUrl('https://ia.net/writer/how-to/quick-tour'),
+  };
+
+  // Native listeners are registered once and read the latest handlers through refs, so they
+  // aren't torn down and re-registered (racily, since unlisten is async) on every keystroke.
+  const menuActionsRef = useRef(menuActions);
+  const confirmCloseAllRef = useRef(confirmCloseAll);
+  useEffect(() => {
+    menuActionsRef.current = menuActions;
+    confirmCloseAllRef.current = confirmCloseAll;
   });
 
   useEffect(() => {
-    if (!isTauriRuntime) return;
+    if (!isTauri) return;
 
-    const unlistenPromise = listen<string>('menu-action', async (event) => {
-      switch (event.payload) {
-        case 'file.new':
-          handleNewFile();
-          break;
-        case 'file.open':
-          await handleOpenFile();
-          break;
-        case 'file.save':
-          await handleSave();
-          break;
-        case 'file.save_as':
-          await handleSaveAs();
-          break;
-        case 'file.rename':
-          await handleRenameFromMenu();
-          break;
-        case 'view.width.narrow':
-          setWidthMode('narrow');
-          break;
-        case 'view.width.wide':
-          setWidthMode('wide');
-          break;
-        case 'view.zoom_in':
-          handleZoomIn();
-          break;
-        case 'view.zoom_out':
-          handleZoomOut();
-          break;
-        case 'view.zoom_reset':
-          handleZoomReset();
-          break;
-        case 'view.theme.system':
-          setThemeMode('system');
-          break;
-        case 'view.theme.light':
-          setThemeMode('light');
-          break;
-        case 'view.theme.dark':
-          setThemeMode('dark');
-          break;
-        case 'view.font.serif':
-          setFontFamily('serif');
-          break;
-        case 'view.font.sans':
-          setFontFamily('sans');
-          break;
-        case 'view.font.mono':
-          setFontFamily('mono');
-          break;
-        case 'help.docs':
-          await openUrl('https://ia.net/writer/how-to/quick-tour');
-          break;
-        default:
-          break;
+    const unlistenMenu = listen<string>('menu-action', (event) => {
+      const id = event.payload;
+      const actions = menuActionsRef.current;
+      if (!Object.prototype.hasOwnProperty.call(actions, id)) return;
+
+      void actions[id]();
+      if (id.startsWith('view.')) setViewMenuClicks((count) => count + 1);
+    });
+
+    const unlistenClose = getCurrentWindow().onCloseRequested(async (event) => {
+      let canClose = false;
+      try {
+        canClose = await confirmCloseAllRef.current();
+      } catch (error) {
+        console.error('Unsaved-changes check failed:', error);
       }
+      if (!canClose) event.preventDefault();
     });
 
     return () => {
-      void unlistenPromise.then((unlisten) => unlisten());
+      void unlistenMenu.then((unlisten) => unlisten());
+      void unlistenClose.then((unlisten) => unlisten());
     };
-  }, [
-    handleNewFile,
-    handleOpenFile,
-    handleSave,
-    handleSaveAs,
-    handleRenameFromMenu,
-    handleZoomIn,
-    handleZoomOut,
-    handleZoomReset,
-    isTauriRuntime,
-  ]);
+  }, [isTauri]);
 
   useEffect(() => {
-    if (!isTauriRuntime) return;
+    if (!isTauri) return;
 
-    const openStartupFile = async () => {
-      try {
-        const startupPath = await invoke<string | null>('startup_file_path');
-        if (startupPath) {
-          await openFileAtPath(startupPath);
-        }
-      } catch (error) {
-        console.error('Failed to load startup file path:', error);
-      }
+    void homeDir().then(setHomePath, () => setHomePath(null));
+
+    // Files to open arrive from argv, from a later `jot` invocation, or from Finder.
+    const openPendingFiles = () => attempt("Couldn't open file", async () => {
+      const paths = await invoke<string[]>('take_pending_files');
+      for (const path of paths) await openPath(path);
+    });
+
+    // Listen before the first claim so a request arriving in between isn't missed.
+    const unlistenPending = listen('pending-files', () => void openPendingFiles());
+    void unlistenPending.then(openPendingFiles);
+
+    return () => {
+      void unlistenPending.then((unlisten) => unlisten());
     };
-
-    void openStartupFile();
-  }, [isTauriRuntime, openFileAtPath]);
-
-  useEffect(() => {
-    if (themeMode === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      const handleChange = (event: MediaQueryListEvent) => {
-        setResolvedTheme(event.matches ? 'dark' : 'light');
-      };
-
-      setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
-      mediaQuery.addEventListener('change', handleChange);
-      return () => mediaQuery.removeEventListener('change', handleChange);
-    }
-
-    setResolvedTheme(themeMode);
-  }, [themeMode]);
+  }, [attempt, isTauri, openPath]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', resolvedTheme);
   }, [resolvedTheme]);
 
-  // Update window title
   useEffect(() => {
-    const updateTitle = async () => {
-      let displayPath = 'Untitled';
-      if (currentPath) {
-        try {
-          const home = await homeDir();
-          if (currentPath.startsWith(home)) {
-            displayPath = '~' + currentPath.slice(home.length);
-          } else {
-            displayPath = currentPath;
-          }
-        } catch {
-          // Fallback to full path if homeDir() fails
-          displayPath = currentPath;
-        }
-      }
-      const title = `${displayPath}${isDirty ? ' *' : ''} · jot`;
+    if (!isTauri) return;
 
-      // Set title for both web and Tauri
-      document.title = title;
-      if (isTauriRuntime) {
-        try {
-          await getCurrentWindow().setTitle(title);
-        } catch (error) {
-          console.error('Failed to set window title:', error);
-        }
-      }
-    };
+    // Match the native title bar to the app; null follows the system.
+    const theme = preferences.themeMode === 'system' ? null : preferences.themeMode;
+    getCurrentWindow().setTheme(theme).catch((error) => {
+      console.error('Failed to set window theme:', error);
+    });
+  }, [isTauri, preferences.themeMode]);
 
-    void updateTitle();
-  }, [currentPath, isDirty, isTauriRuntime]);
+  useEffect(() => {
+    if (!isTauri) return;
+
+    // Show the current theme, font, and width as check marks in the View menu.
+    const checked = [
+      `view.theme.${preferences.themeMode}`,
+      `view.font.${preferences.fontFamily}`,
+      ...(preferences.widthMode === 'wide' ? ['view.wide'] : []),
+    ];
+    invoke('sync_view_menu', { checked }).catch((error) => {
+      console.error('Failed to update the View menu:', error);
+    });
+  }, [isTauri, preferences.themeMode, preferences.fontFamily, preferences.widthMode, viewMenuClicks]);
+
+  useEffect(() => {
+    const displayPath = activePath && homePath
+      ? abbreviateHome(activePath, homePath)
+      : activePath ?? getDisplayName(null);
+    const title = `${displayPath}${activeIsDirty ? ' *' : ''}`;
+
+    document.title = title;
+    if (isTauri) {
+      getCurrentWindow().setTitle(title).catch((error) => {
+        console.error('Failed to set window title:', error);
+      });
+    }
+  }, [activePath, activeIsDirty, homePath, isTauri]);
 
   return (
     <div className="app-container">
-      <EditorToolbar
-        currentFilePath={currentPath}
-        hasUnsavedChanges={isDirty}
-        onNew={handleNewFile}
-        onOpen={handleOpenFile}
-        onSave={handleSave}
+      <TabBar
+        documents={documents}
+        activeId={activeId}
+        renamingId={renamingId}
+        onActivate={activate}
+        onClose={(id) => void handleCloseTab(id)}
+        onNew={newDocument}
+        onStartRename={handleStartRename}
+        onCancelRename={handleCancelRename}
         onRename={handleRename}
       />
       <div
-        className={`editor-wrapper font-${fontFamily} width-${widthMode}`}
-        style={{ '--editor-scale': String(textScale) } as Record<string, string>}
+        className={`editor-wrapper font-${preferences.fontFamily} width-${preferences.widthMode}`}
+        style={{ '--editor-scale': String(preferences.textScale) } as React.CSSProperties}
       >
-        <Editor
-          key={fileVersion}
-          value={markdown}
-          onChange={setMarkdown}
-          textScale={textScale}
-        />
+        {documents.map((doc) => (
+          <Editor
+            key={doc.id}
+            ref={editorRef(doc.id)}
+            initialValue={doc.markdown}
+            onReady={(markdown) => handleEditorReady(doc.id, markdown)}
+            onChange={(markdown) => setMarkdown(doc.id, markdown)}
+            textScale={preferences.textScale}
+            active={doc.id === activeId}
+          />
+        ))}
       </div>
-      {toastMessage && (
-        <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
+      {toast && (
+        <Toast key={toast.id} message={toast.message} onClose={dismissToast} />
       )}
     </div>
   );

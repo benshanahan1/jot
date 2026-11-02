@@ -9,45 +9,82 @@ function setPlatform(value: string): void {
   });
 }
 
+function press(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key, cancelable: true, ...init });
+  window.dispatchEvent(event);
+  return event;
+}
+
+function makeHandlers() {
+  return {
+    onNextTab: vi.fn(),
+    onPreviousTab: vi.fn(),
+    onSelectTab: vi.fn(),
+    onZoomIn: vi.fn(),
+    onZoomOut: vi.fn(),
+    onZoomReset: vi.fn(),
+  };
+}
+
 describe('useHotkeys', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('routes mac save hotkeys', () => {
+  it('switches tabs with Ctrl+Tab and Mod+number', () => {
     setPlatform('MacIntel');
-    const onNew = vi.fn();
-    const onOpen = vi.fn();
-    const onSave = vi.fn();
-    const onSaveAs = vi.fn();
+    const handlers = makeHandlers();
+    renderHook(() => useHotkeys(handlers));
 
-    renderHook(() => useHotkeys({ onNew, onOpen, onSave, onSaveAs }));
+    expect(press('Tab', { ctrlKey: true }).defaultPrevented).toBe(true);
+    press('Tab', { ctrlKey: true, shiftKey: true });
+    press('2', { metaKey: true });
+    press('9', { metaKey: true });
+    press('2', { ctrlKey: true });
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', metaKey: true }));
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'S', metaKey: true, shiftKey: true }));
-
-    expect(onSave).toHaveBeenCalledTimes(1);
-    expect(onSaveAs).toHaveBeenCalledTimes(1);
-    expect(onNew).not.toHaveBeenCalled();
-    expect(onOpen).not.toHaveBeenCalled();
+    expect(handlers.onNextTab).toHaveBeenCalledTimes(1);
+    expect(handlers.onPreviousTab).toHaveBeenCalledTimes(1);
+    expect(handlers.onSelectTab.mock.calls).toEqual([[1], [-1]]);
   });
 
-  it('routes ctrl shortcuts on non-mac', () => {
+  it('uses Ctrl as the modifier on other platforms', () => {
     setPlatform('Win32');
-    const onNew = vi.fn();
-    const onOpen = vi.fn();
-    const onSave = vi.fn();
-    const onSaveAs = vi.fn();
+    const handlers = makeHandlers();
+    renderHook(() => useHotkeys(handlers));
 
-    renderHook(() => useHotkeys({ onNew, onOpen, onSave, onSaveAs }));
+    press('1', { ctrlKey: true });
+    press('1', { metaKey: true });
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', ctrlKey: true }));
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'o', ctrlKey: true }));
-
-    expect(onNew).toHaveBeenCalledTimes(1);
-    expect(onOpen).toHaveBeenCalledTimes(1);
-    expect(onSave).not.toHaveBeenCalled();
-    expect(onSaveAs).not.toHaveBeenCalled();
+    expect(handlers.onSelectTab.mock.calls).toEqual([[0]]);
   });
 
+  it('handles zoom key variants and leaves other shortcuts to the menu', () => {
+    setPlatform('MacIntel');
+    const handlers = makeHandlers();
+    renderHook(() => useHotkeys(handlers));
+
+    press('=', { metaKey: true });
+    press('+', { metaKey: true, shiftKey: true });
+    press('-', { metaKey: true });
+    press('0', { metaKey: true });
+    expect(press('s', { metaKey: true }).defaultPrevented).toBe(false);
+    expect(press('1', { metaKey: true, altKey: true }).defaultPrevented).toBe(false);
+
+    expect(handlers.onZoomIn).toHaveBeenCalledTimes(2);
+    expect(handlers.onZoomOut).toHaveBeenCalledTimes(1);
+    expect(handlers.onZoomReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls the latest handlers after a rerender', () => {
+    setPlatform('MacIntel');
+    const first = makeHandlers();
+    const second = makeHandlers();
+    const { rerender } = renderHook((handlers) => useHotkeys(handlers), { initialProps: first });
+
+    rerender(second);
+    press('Tab', { ctrlKey: true });
+
+    expect(first.onNextTab).not.toHaveBeenCalled();
+    expect(second.onNextTab).toHaveBeenCalledTimes(1);
+  });
 });

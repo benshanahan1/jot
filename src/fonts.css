@@ -1,0 +1,5 @@
+/* Bundled with the app so editor fonts load instantly and offline. */
+@import '@fontsource-variable/eb-garamond/wght.css';
+@import '@fontsource-variable/eb-garamond/wght-italic.css';
+@import '@fontsource-variable/inconsolata/wght.css';
+@import '@fontsource-variable/jetbrains-mono/wght.css';

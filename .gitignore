@@ -31,3 +31,6 @@ src-tauri/icons/64x64.png
 *.njsproj
 *.sln
 *.sw?
+
+# TypeScript incremental build info
+*.tsbuildinfo
